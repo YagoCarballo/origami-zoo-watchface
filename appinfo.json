@@ -1,0 +1,52 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "yagocarballo",
+    "longName": "Origami",
+    "projectType": "native",
+    "resources": {
+        "media": [
+            {
+                "file": "data/timebox.pdc",
+                "name": "UI_TIMEBOX",
+                "type": "raw"
+            },
+            {
+                "file": "data/OrigamiButterfly.pdc",
+                "name": "ORIGAMI_BUTTERFLY",
+                "type": "raw"
+            },
+            {
+                "file": "data/OrigamiSnail.pdc",
+                "name": "ORIGAMI_SNAIL",
+                "type": "raw"
+            },
+            {
+                "characterRegex": "[\\s\\S]",
+                "file": "fonts/OpenSans-Light.ttf",
+                "name": "OPEN_SANS_LIGHT_12",
+                "trackingAdjust": 1,
+                "type": "font"
+            },
+            {
+                "characterRegex": "[0-9:]",
+                "file": "fonts/OpenSans-Light.ttf",
+                "name": "OPEN_SANS_LIGHT_40",
+                "trackingAdjust": 1,
+                "type": "font"
+            }
+        ]
+    },
+    "sdkVersion": "3",
+    "shortName": "Origami",
+    "targetPlatforms": [
+        "basalt"
+    ],
+    "uuid": "1fc906d3-465c-432c-8939-d558363643fb",
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": true
+    }
+}

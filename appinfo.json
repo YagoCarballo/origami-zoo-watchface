@@ -24,6 +24,16 @@
                 "type": "raw"
             },
             {
+                "file": "data/bird.pdc",
+                "name": "ORIGAMI_BIRD",
+                "type": "raw"
+            },
+            {
+                "file":"images/bird.png",
+                "name":"ORIGAMI_BIRD_ANIMATION",
+                "type":"raw"
+            },
+            {
                 "characterRegex": "[\\s\\S]",
                 "file": "fonts/OpenSans-Light.ttf",
                 "name": "OPEN_SANS_LIGHT_12",

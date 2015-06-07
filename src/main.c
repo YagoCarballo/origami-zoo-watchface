@@ -1,6 +1,6 @@
 #include <pebble.h>
 #include "origami_resources.h"
-#include "gdraw_command_transforms.h"
+#include "bird.h"
 
 static struct OrigamiUI
 {
@@ -28,24 +28,132 @@ static struct Battery
 	int level : 28;
 } battery;
 
-static struct OrigamiAnimal
+static struct AnimalPaths
 {
-	GDrawCommandImage *image;
-	int progress;
-	Animation* animation;
-	Animation* animation_reverse;
-} animal;
+	GPath * wing_b;
+	GPath * head;
+	GPath * body;
+	GPath * wing_f;
+} animal_paths;
 
-bool started = false;
+static struct AnimalInfo
+{
+	bool animationCreated;
+	Origami currentAnimal;
+	Animation * animation;
+	GColor8 animalColor;
+	GColor8 hudColor;
+	GColor8 backgroundColor;
+} animal_info;
 
-static void update_animal_progress (Animation *animation, const AnimationProgress progress) {
-	animal.progress = (progress - ANIMATION_NORMALIZED_MAX);
-	layer_mark_dirty(ui.animal);
+////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// ANIMATION ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+void animal_animation_update (Animation *animation, const AnimationProgress progress)
+{
+  float percentage = ((float) progress / ANIMATION_NORMALIZED_MAX);
+
+  update_bird(
+	  percentage,
+	  animal_paths.wing_b,
+	  animal_paths.head,
+	  animal_paths.body,
+	  animal_paths.wing_f
+  );
+
+  layer_mark_dirty(ui.animal);
 }
 
 static const AnimationImplementation animal_animation_implementation = {
-	.update = (AnimationUpdateImplementation) update_animal_progress
+  .update = (AnimationUpdateImplementation) animal_animation_update
 };
+
+static void createAnimation ()
+{
+	if (animal_info.animationCreated == false)
+	{
+		animal_info.animationCreated = true;
+		animal_info.animation = animation_create();
+		animation_set_duration(animal_info.animation, 1200);
+		animation_set_implementation(animal_info.animation, &animal_animation_implementation);
+		animation_set_curve(animal_info.animation, AnimationCurveEaseInOut);
+		animation_set_play_count(animal_info.animation, 5);
+	}
+}
+
+static void startAnimation ()
+{
+	animation_schedule(animal_info.animation);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// ANIMALS ////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+// Bird
+
+void create_bird ()
+{
+	animal_info.animalColor		= GColorRed;
+	animal_info.backgroundColor	= GColorWhite;
+	animal_info.hudColor		= GColorRajah;
+	animal_paths.wing_b			= gpath_create(&BIRD_WING_B);
+	animal_paths.head			= gpath_create(&BIRD_HEAD);
+	animal_paths.body			= gpath_create(&BIRD_BODY);
+	animal_paths.wing_f			= gpath_create(&BIRD_WING_F);
+}
+
+void destroy_bird ()
+{
+	gpath_destroy(animal_paths.wing_b);
+	gpath_destroy(animal_paths.head);
+	gpath_destroy(animal_paths.body);
+	gpath_destroy(animal_paths.wing_f);
+}
+
+
+void change_animal (Origami animal)
+{
+	// if (animal_info.currentAnimal != animal)
+	// {
+	// 	switch (animal_info.currentAnimal)
+	// 	{
+	// 		case BUTTERFLY:
+	// 		case SNAIL:
+	// 			return;
+	// 		case BIRD:
+	// 			destroy_bird();
+	// 	}
+	// }
+
+	switch (animal)
+	{
+		default:
+		case BUTTERFLY:
+		case SNAIL:
+		case BIRD:
+			create_bird();
+	}
+
+	window_set_background_color(ui.window, animal_info.backgroundColor);
+}
+
+void draw_animal_part (GContext* ctx, GPath * part, GColor8 color)
+{
+  // Fill the path
+  graphics_context_set_fill_color(ctx, color);
+  gpath_draw_filled(ctx, part);
+
+  // Stroke the path
+  graphics_context_set_stroke_color(ctx, GColorBlack);
+  gpath_draw_outline(ctx, part);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// BATTERY //////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 static void update_battery_info (BatteryChargeState charge_state)
 {
@@ -70,6 +178,10 @@ static void battery_handler(BatteryChargeState charge_state) {
 	update_battery_info(charge_state);
 	layer_mark_dirty(ui.battery);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////// CLOCK /////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 static void update_time() {
   // Get a tm structure
@@ -100,6 +212,10 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 	update_time();
 }
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// LAYERS //////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
 static void background_update_proc(Layer *layer, GContext *ctx)
 {
 	// If the image was loaded successfully...
@@ -128,21 +244,15 @@ static void battery_update_proc(Layer *layer, GContext *ctx)
 
 static void animal_update_proc(Layer *layer, GContext *ctx)
 {
-	// If the image was loaded successfully...
-	if (animal.image) {
-		// // Set the image's position
-		// GPoint origin = GPoint(0, 0);
-		//
-		// // Draw it
-		// gdraw_command_image_draw(ctx, animal.image, origin);
-
-		GDrawCommandImage *temp_copy = gdraw_command_image_clone(animal.image);
-		attract_draw_command_image_to_square(temp_copy, animal.progress);
-		graphics_context_set_antialiased(ctx, true);
-		gdraw_command_image_draw(ctx, temp_copy, GPoint(0, 0));
-		free(temp_copy);
-	}
+	draw_animal_part(ctx, animal_paths.wing_b,	animal_info.animalColor);
+	draw_animal_part(ctx, animal_paths.head,	animal_info.animalColor);
+	draw_animal_part(ctx, animal_paths.body,	animal_info.animalColor);
+	draw_animal_part(ctx, animal_paths.wing_f,	animal_info.animalColor);
 }
+
+////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// GUI //////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 void setup_paths(void) {
 	// Sets up the Battery Base Path
@@ -167,13 +277,18 @@ static void window_load(Window *window) {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_bounds(window_layer);
 
+	// Create animal Layer and set up the update procedure
+	ui.animal = layer_create(bounds);
+	layer_set_update_proc(ui.animal, animal_update_proc);
+	layer_add_child(window_layer, ui.animal);
+
 	// Create canvas Layer and set up the update procedure
 	ui.background = layer_create(bounds);
 	layer_set_update_proc(ui.background, background_update_proc);
 	layer_add_child(window_layer, ui.background);
 
 	// Creates the Hour Layer
-	GRect hours_layer_bounds = GRect(8, 90, 125, 52);
+	GRect hours_layer_bounds = GRect(0, 90, 144, 52);
 	ui.hour = text_layer_create(hours_layer_bounds);
 
 	GFont open_sans_light_40 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_OPEN_SANS_LIGHT_40));
@@ -203,20 +318,9 @@ static void window_load(Window *window) {
 	layer_set_update_proc(ui.battery, battery_update_proc);
 	layer_add_child(window_layer, ui.battery);
 
-	// Create animal Layer and set up the update procedure
-	ui.animal = layer_create(bounds);
-	layer_set_update_proc(ui.animal, animal_update_proc);
-	layer_add_child(window_layer, ui.animal);
-
 	// Load the background and check it was succcessful
 	ui.ui_timebox = gdraw_command_image_create_with_resource(RESOURCE_ID_UI_TIMEBOX);
 	if (!ui.ui_timebox) {
-		APP_LOG(APP_LOG_LEVEL_ERROR, "Image is NULL!");
-	}
-
-	// Load the animal and check it was succcessful
-	animal.image = origami_zoo_random_animal();
-	if (!animal.image) {
 		APP_LOG(APP_LOG_LEVEL_ERROR, "Image is NULL!");
 	}
 
@@ -226,19 +330,11 @@ static void window_load(Window *window) {
 	// Register Battery Service
 	battery_state_service_subscribe(battery_handler);
 
-	// Use NULL as 'from' value, this will make the animation framework call the getter
-	// to get the current value of the property and use that as the 'from' value:
-	animal.animation = animation_create();
-	animation_set_duration(animal.animation, 1200);
-	animation_set_implementation(animal.animation, &animal_animation_implementation);
-	animation_set_curve(animal.animation, AnimationCurveEaseInOut);
-	animation_schedule(animal.animation);
+	change_animal(BIRD);
 
-	// animal.animation_reverse = animation_clone(animal.animation);
-	// animation_set_reverse(animal.animation_reverse, true);
-
-	// animation_sequence_create(animal.animation, animal.animation_reverse, NULL);
-	// animation_schedule(animal.animation);
+	layer_mark_dirty(ui.animal);
+	createAnimation();
+	startAnimation();
 }
 
 static void window_unload(Window *window) {
@@ -252,7 +348,6 @@ static void window_unload(Window *window) {
 	text_layer_destroy(ui.date);
 
 	// Destroy the image
-	gdraw_command_image_destroy(animal.image);
 	gdraw_command_image_destroy(ui.ui_timebox);
 }
 

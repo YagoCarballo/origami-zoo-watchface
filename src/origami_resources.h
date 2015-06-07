@@ -4,11 +4,9 @@
 
 typedef enum {
     BUTTERFLY,
-    SNAIL
+    SNAIL,
+    BIRD
 } Origami;
-
-GDrawCommandImage *origami_zoo_get_animal(Origami animal);
-GDrawCommandImage *origami_zoo_random_animal();
 
 // static const GPathInfo TIMEBOX_PATH = {
 // 	.num_points = 17,
